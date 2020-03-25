@@ -23,6 +23,9 @@ def create(request):
         if form.is_valid():
             form.save()
             return redirect('index')
+        else:
+            return render(request, 'favsapp/create.html', {'form': form})
+
     form = FavsForm()
 
     return render(request, 'favsapp/create.html', {'form': form})
