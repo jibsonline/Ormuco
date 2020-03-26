@@ -1,0 +1,55 @@
+stages:
+  - build
+  - s3
+  - docker
+
+variables:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=true"
+
+cache:
+  key: $CI_PROJECT_NAME
+  paths:
+    - .gradle/wrapper/
+    - .gradle/caches/
+
+before_script:
+  - export GRADLE_USER_HOME=`pwd`/.gradle
+  - export GRADLE_OPTS="-Dorg.gradle.daemon=true"
+
+build:staging:
+  stage: build
+  script:
+    - echo " " >> src/main/resources/application-staging.properties
+    - echo "paytm.api.authorisation.token="$PAYTM_API_AUTH_TOKEN_PROD >> src/main/resources/application-staging.properties
+    - echo " " >> src/main/resources/application-dev.properties
+    - echo "paytm.api.authorisation.token="$PAYTM_API_AUTH_TOKEN_STAGE >> src/main/resources/application-dev.properties
+    - ./gradlew clean build -x test
+  only:
+    - staging
+  artifacts:
+    paths:
+      - build/libs
+
+
+push_staging_s3:
+  dependencies:
+    - build:staging
+  stage: s3
+  script:
+    - aws s3 cp ./build/libs/$CI_PROJECT_NAME-0.0.1-SNAPSHOT.jar s3://pm-stage-release-jars/$CI_PROJECT_NAME/app_${CI_COMMIT_SHA:0:8}.jar --region=ap-south-1
+  only:
+    - staging
+
+
+
+docker:staging:
+  dependencies:
+    - build:staging
+  stage: docker
+  script:
+    - $(/usr/local/bin/aws ecr get-login --no-include-email --region ap-south-1)
+    - docker build . -t $CI_PROJECT_NAME":staging_"${CI_COMMIT_SHA:0:8}
+    - docker tag $CI_PROJECT_NAME:staging_${CI_COMMIT_SHA:0:8} 656952484900.dkr.ecr.ap-south-1.amazonaws.com/$CI_PROJECT_NAME:staging_${CI_COMMIT_SHA:0:8}
+    - docker push 656952484900.dkr.ecr.ap-south-1.amazonaws.com/$CI_PROJECT_NAME:staging_${CI_COMMIT_SHA:0:8}
+  only:
+    - staging
