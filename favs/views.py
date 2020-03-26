@@ -29,3 +29,9 @@ def create(request):
     form = FavsForm()
 
     return render(request, 'favsapp/create.html', {'form': form})
+
+def version(request):
+
+    form = FavsForm()
+
+    return render(request, 'favsapp/version', {'form': form})
